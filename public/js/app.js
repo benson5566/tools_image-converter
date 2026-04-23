@@ -19,6 +19,7 @@ let bgColor         = '#ffffff';
 let hasTransparent  = false; // any selected file has alpha
 let isConverting    = false;
 let convertResults  = [];   // result objects from API
+let turnstileToken  = null;
 
 // ── DOM refs ─────────────────────────────────
 const dropZone         = document.getElementById('dropZone');
@@ -328,7 +329,7 @@ fileList.addEventListener('click', e => {
 // ── Convert button state ─────────────────────
 
 function updateConvertBtn() {
-  convertBtn.disabled = selectedFiles.length === 0 || isConverting;
+  convertBtn.disabled = selectedFiles.length === 0 || isConverting || !turnstileToken;
 }
 
 // ── Conversion ───────────────────────────────
@@ -450,6 +451,10 @@ convertBtn.addEventListener('click', async () => {
     if (hasTransparent) formData.append('bgColor', bgColor);
   }
 
+  if (turnstileToken) {
+    formData.append('cf-turnstile-response', turnstileToken);
+  }
+
   try {
     const response = await fetch('/api/convert', {
       method: 'POST',
@@ -491,6 +496,11 @@ convertBtn.addEventListener('click', async () => {
     showError(`轉換失敗：${err.message || '請稍後再試'}`);
   } finally {
     setConverting(false);
+    if (window.turnstile) {
+      window.turnstile.reset();
+      turnstileToken = null;
+      updateConvertBtn();
+    }
   }
 });
 
@@ -512,6 +522,17 @@ downloadAllBtn.addEventListener('click', () => {
     }, i * 120);
   });
 });
+
+// ── Turnstile callbacks ───────────────────────
+
+window.onTurnstileSuccess = function(token) {
+  turnstileToken = token;
+  updateConvertBtn();
+};
+window.onTurnstileExpired = function() {
+  turnstileToken = null;
+  updateConvertBtn();
+};
 
 // ── Init ──────────────────────────────────────
 

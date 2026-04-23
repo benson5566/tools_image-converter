@@ -5,10 +5,12 @@ const path = require('path');
 const fs = require('fs');
 
 const convertRouter = require('./routes/convert');
+const { logger } = require('./utils/logger');
 
 // ── Ensure tmp directory exists ────────────────────────────────────────────
 const TMP_DIR = '/tmp/image-converter';
 fs.mkdirSync(TMP_DIR, { recursive: true });
+fs.chmodSync(TMP_DIR, 0o700);
 
 // ── App setup ──────────────────────────────────────────────────────────────
 const app = express();
@@ -17,6 +19,14 @@ const PORT = process.env.PORT || 3000;
 // Parse JSON bodies (for non-multipart routes)
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// ── Request logging middleware ──────────────────────────────────────────────
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    logger.info('request', { method: req.method, path: req.path, status: res.statusCode, ip: req.ip });
+  });
+  next();
+});
 
 // ── Static files ───────────────────────────────────────────────────────────
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -57,7 +67,7 @@ app.use((_req, res) => {
 // Catches multer errors (e.g. file too large, too many files) and other sync throws
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
-  console.error('[Global error handler]', err.message);
+  logger.error('global error handler', { message: err.message, code: err.code });
 
   // Multer-specific error codes
   if (err.code === 'LIMIT_FILE_SIZE') {

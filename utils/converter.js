@@ -56,6 +56,9 @@ async function convertImage(inputBuffer, originalName, options = {}) {
   // ── 4. Apply format-specific transformations ───────────────────────────────
   const hasAlpha = metadata.hasAlpha;
 
+  // Strip EXIF / metadata from all output formats (privacy hardening)
+  pipeline = pipeline.withMetadata(false);
+
   switch (outputFormat) {
     case 'jpg': {
       // Flatten transparency onto bgColor before encoding as JPEG

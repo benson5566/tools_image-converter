@@ -1,5 +1,14 @@
 'use strict';
 
+// ── Optional Redis client (falls back to in-memory if unavailable) ─────────────
+
+let redisClient = null;
+try {
+  const { createClient } = require('redis');
+  redisClient = createClient({ url: process.env.REDIS_URL || 'redis://localhost:6379' });
+  redisClient.connect().catch(() => { redisClient = null; });
+} catch { redisClient = null; }
+
 // ── Constants ──────────────────────────────────────────────────────────────────
 
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;   // 1 minute
@@ -23,10 +32,10 @@ function securityHeaders(req, res, next) {
   // Disallow embedding in iframes (clickjacking prevention)
   res.setHeader('X-Frame-Options', 'DENY');
 
-  // Minimal CSP: only allow resources from the same origin
+  // CSP: allow same-origin resources + Cloudflare Turnstile challenge scripts/frames
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'"
+    "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com"
   );
 
   // Legacy XSS filter for older browsers
@@ -69,10 +78,36 @@ function _getClientIp(req) {
 
 /**
  * Rate-limit middleware: max RATE_LIMIT_MAX requests per IP per RATE_LIMIT_WINDOW_MS.
+ *
+ * Uses Redis (INCR + EXPIRE) when a live Redis connection is available;
+ * falls back to the in-memory Map otherwise.
  */
-function rateLimiter(req, res, next) {
-  const now = Date.now();
+async function rateLimiter(req, res, next) {
   const ip = _getClientIp(req);
+
+  // ── Redis path ─────────────────────────────────────────────────────────────
+  if (redisClient && redisClient.isOpen) {
+    try {
+      const key = `rate:${ip}`;
+      const count = await redisClient.incr(key);
+      if (count === 1) await redisClient.expire(key, 60);
+      if (count > RATE_LIMIT_MAX) {
+        const ttl = await redisClient.ttl(key);
+        const retryAfterSec = ttl > 0 ? ttl : 60;
+        res.setHeader('Retry-After', String(retryAfterSec));
+        return res.status(429).json({
+          error: '請求過於頻繁，請稍後再試。',
+          retryAfterSeconds: retryAfterSec,
+        });
+      }
+      return next();
+    } catch {
+      // Redis error: fall through to in-memory fallback
+    }
+  }
+
+  // ── In-memory fallback ─────────────────────────────────────────────────────
+  const now = Date.now();
 
   // Prune entries whose window has expired (prevent unbounded Map growth).
   for (const [key, entry] of _rateLimitStore) {

@@ -502,7 +502,8 @@ body {
    ============================================= */
 .convert-row {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
 }
 
 .convert-btn {
@@ -842,4 +843,20 @@ body {
   .results-list {
     grid-template-columns: 1fr;
   }
+}
+
+/* =============================================
+   Turnstile
+   ============================================= */
+.turnstile-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.turnstile-hint {
+  font-size: 0.75rem;
+  color: #888;
+  margin: 0;
 }

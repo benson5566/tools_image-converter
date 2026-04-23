@@ -8,6 +8,7 @@ const fsp = require('fs').promises;
 const { v4: uuidv4 } = require('uuid');
 const sharp = require('sharp');
 const { convertImage } = require('../utils/converter');
+const { logger } = require('../utils/logger');
 
 const router = express.Router();
 
@@ -110,6 +111,20 @@ router.post(
   upload.array('files[]', MAX_FILES),
   async (req, res) => {
     try {
+      // ── Cloudflare Turnstile verification (when secret key is configured) ──
+      const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET_KEY;
+      if (TURNSTILE_SECRET) {
+        const token = req.body['cf-turnstile-response'];
+        if (!token) return res.status(400).json({ error: '請完成人機驗證' });
+        const verifyRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ secret: TURNSTILE_SECRET, response: token }),
+        });
+        const verifyData = await verifyRes.json();
+        if (!verifyData.success) return res.status(403).json({ error: '人機驗證失敗，請重試' });
+      }
+
       // Validate files presence
       const files = req.files;
       if (!files || files.length === 0) {
@@ -223,9 +238,10 @@ router.post(
         }),
       );
 
+      logger.info('convert', { files: files.length, outputFormat, totalSize, ip: req.ip });
       return res.json({ results });
     } catch (err) {
-      console.error('[/api/convert] Unhandled error:', err);
+      logger.error('convert unhandled error', { message: err.message, ip: req.ip });
       return res.status(500).json({ error: '伺服器內部錯誤' });
     }
   },
@@ -259,7 +275,7 @@ router.get('/download/:filename', async (req, res) => {
   res.download(filePath, downloadName, async (err) => {
     if (err) {
       // Header already sent – just log
-      console.error('[/download] Error sending file:', err.message);
+      logger.error('download error', { file: filename, message: err.message });
       return;
     }
     // Delete after successful download
