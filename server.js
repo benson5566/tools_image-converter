@@ -6,6 +6,7 @@ const fs = require('fs');
 
 const convertRouter = require('./routes/convert');
 const { logger } = require('./utils/logger');
+const { securityHeaders, rateLimiter } = require('./middleware/security');
 
 // ── Ensure tmp directory exists ────────────────────────────────────────────
 const TMP_DIR = '/tmp/image-converter';
@@ -19,6 +20,12 @@ const PORT = process.env.PORT || 3000;
 // Parse JSON bodies (for non-multipart routes)
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+// ── Security headers (applied to all responses) ────────────────────────────
+app.use(securityHeaders);
+
+// ── Rate limiting (applied to API routes only) ─────────────────────────────
+app.use('/api', rateLimiter);
 
 // ── Request logging middleware ──────────────────────────────────────────────
 app.use((req, res, next) => {

@@ -25,6 +25,7 @@ const SUPPORTED_INPUT_MIMES = new Set([
   'image/avif',
   'image/png',
   'image/jpeg',
+  'application/octet-stream', // curl 等工具未指定 type 時的 fallback，magic bytes 負責實際驗證
 ]);
 
 const SUPPORTED_OUTPUT_FORMATS = new Set(['png', 'jpg', 'webp']);
@@ -75,6 +76,9 @@ function detectMagicBytes(buf) {
 }
 
 // ── Multer setup – memory storage so we can inspect bytes ─────────────────
+// NOTE: fileFilter 也接受 application/octet-stream，因為部分 HTTP 客戶端
+// （如 curl）無法正確推斷 .webp 等格式的 MIME type。
+// 真正的格式驗證由後續的 magic bytes 檢查負責。
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
@@ -82,7 +86,7 @@ const upload = multer({
     fileSize: MAX_FILE_SIZE,
   },
   fileFilter(_req, file, cb) {
-    if (SUPPORTED_INPUT_MIMES.has(file.mimetype)) {
+    if (SUPPORTED_INPUT_MIMES.has(file.mimetype) || file.mimetype === 'application/octet-stream') {
       cb(null, true);
     } else {
       cb(new Error(`不支援的檔案類型：${file.mimetype}`));
