@@ -147,7 +147,7 @@ router.post(
       const outputFormat = (req.body.outputFormat || '').toLowerCase();
       if (!SUPPORTED_OUTPUT_FORMATS.has(outputFormat)) {
         return res.status(400).json({
-          error: `不支援的輸出格式：${outputFormat}，請使用 png、jpg 或 webp`,
+          error: '不支援的輸出格式，請使用 png、jpg 或 webp',
         });
       }
 
@@ -214,18 +214,26 @@ router.post(
             );
 
             // 4. Write to tmp with UUID prefix to avoid collisions
+            // Use only UUID + extension for the stored filename to ensure
+            // filesystem and URL safety regardless of original filename encoding.
             const uuid = uuidv4();
-            const storedName = `${uuid}-${outputName}`;
+            const ext = outputFormat; // 'png' | 'jpg' | 'webp'
+            const storedName = `${uuid}.${ext}`;
             const storedPath = path.join(TMP_DIR, storedName);
             await fsp.writeFile(storedPath, outBuf);
 
             // 5. Schedule TTL cleanup
             scheduleCleanup(storedPath);
 
+            // Encode outputName so the download URL is always valid,
+            // while the human-readable filename (outputName) is preserved
+            // for Content-Disposition via the download route.
+            const encodedOutputName = encodeURIComponent(outputName);
+
             return {
               originalName: originalname,
               outputName,
-              downloadUrl: `/download/${storedName}`,
+              downloadUrl: `/download/${storedName}?name=${encodedOutputName}`,
               warnings,
               success: true,
             };
@@ -253,9 +261,10 @@ router.post(
 
 // ── GET /download/:filename ────────────────────────────────────────────────
 router.get('/download/:filename', async (req, res) => {
-  // Sanitise: allow only safe filename characters (uuid + basename + ext)
+  // Stored filenames are now UUID-only (e.g. "<uuid>.png"), so we only need
+  // to allow alphanumeric, hyphens and dots.
   const { filename } = req.params;
-  if (!/^[a-zA-Z0-9_\-\.]+$/.test(filename)) {
+  if (!/^[a-zA-Z0-9\-\.]+$/.test(filename)) {
     return res.status(400).json({ error: '無效的檔案名稱' });
   }
 
@@ -273,8 +282,10 @@ router.get('/download/:filename', async (req, res) => {
     return res.status(404).json({ error: '檔案不存在或已過期' });
   }
 
-  // Derive a clean download filename (strip UUID prefix: "<uuid>-<name>")
-  const downloadName = filename.replace(/^[a-f0-9-]{36}-/, '');
+  // Use the human-readable name from query param if provided (URL-encoded),
+  // otherwise fall back to the stored filename.
+  const rawName = req.query.name;
+  const downloadName = rawName ? decodeURIComponent(rawName) : filename;
 
   res.download(filePath, downloadName, async (err) => {
     if (err) {

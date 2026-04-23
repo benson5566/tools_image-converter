@@ -41,6 +41,9 @@ function securityHeaders(req, res, next) {
   // Legacy XSS filter for older browsers
   res.setHeader('X-XSS-Protection', '1; mode=block');
 
+  // HSTS: force HTTPS for 2 years (only effective when served over HTTPS)
+  res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains');
+
   next();
 }
 

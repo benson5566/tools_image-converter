@@ -16,6 +16,7 @@ fs.chmodSync(TMP_DIR, 0o700);
 // ── App setup ──────────────────────────────────────────────────────────────
 const app = express();
 const PORT = process.env.PORT || 3000;
+app.disable('x-powered-by');
 
 // Parse JSON bodies (for non-multipart routes)
 app.use(express.json());
