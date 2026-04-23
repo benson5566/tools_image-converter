@@ -1,100 +1,50 @@
 'use strict';
 
-const sharp = require('sharp');
+const { Worker } = require('worker_threads');
+const path = require('path');
+
+const WORKER_PATH = path.join(__dirname, '../workers/converter-worker.js');
 
 /**
- * Detect if AVIF/image has non-sRGB colorspace from Sharp metadata.
- * Sharp reports colorspace as 'srgb', 'rgb16', 'cmyk', etc.
+ * Convert a single image buffer via a dedicated Worker Thread.
+ * Isolates Sharp/libvips from the main Express process.
  */
-function isNonSrgb(metadata) {
-  const { space } = metadata;
-  if (!space) return false;
-  return space !== 'srgb';
-}
+function convertImage(inputBuffer, originalName, options = {}) {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(WORKER_PATH, {
+      workerData: {
+        inputBuffer: inputBuffer.buffer.slice(
+          inputBuffer.byteOffset,
+          inputBuffer.byteOffset + inputBuffer.byteLength
+        ),
+        originalName,
+        options,
+      },
+      transferList: [
+        inputBuffer.buffer.slice(
+          inputBuffer.byteOffset,
+          inputBuffer.byteOffset + inputBuffer.byteLength
+        ),
+      ],
+    });
 
-/**
- * Convert a single image buffer to the target format.
- *
- * @param {Buffer}  inputBuffer   - Raw file bytes
- * @param {string}  originalName  - Original filename (for output name derivation)
- * @param {object}  options
- * @param {string}  options.outputFormat  - 'png' | 'jpg' | 'webp'
- * @param {number}  [options.jpgQuality=85]  - JPEG quality 60-100
- * @param {string}  [options.bgColor='#ffffff']  - Hex background for JPG flatten
- * @returns {Promise<{ buffer: Buffer, outputName: string, warnings: string[] }>}
- */
-async function convertImage(inputBuffer, originalName, options = {}) {
-  const {
-    outputFormat,
-    jpgQuality = 85,
-    bgColor = '#ffffff',
-  } = options;
-
-  const warnings = [];
-
-  // Build initial Sharp pipeline from buffer
-  let pipeline = sharp(inputBuffer, { failOn: 'none' });
-
-  // ── 1. Fetch metadata BEFORE any transformation ───────────────────────────
-  const metadata = await pipeline.metadata();
-
-  // ── 2. Animated WebP: extract first frame ─────────────────────────────────
-  if (metadata.pages && metadata.pages > 1) {
-    warnings.push('此檔案為動態 WebP，僅保留第一幀');
-    // Re-create pipeline with page option to extract only the first frame
-    pipeline = sharp(inputBuffer, { failOn: 'none', page: 0 });
-    // Re-fetch metadata for the single frame
-    await pipeline.metadata();
-  }
-
-  // ── 3. HDR / non-sRGB colorspace: tone-map to sRGB ────────────────────────
-  if (isNonSrgb(metadata)) {
-    warnings.push('此圖片含 HDR 色域，已自動轉換為標準色域，顏色可能略有差異');
-    pipeline = pipeline.toColorspace('srgb');
-  }
-
-  // ── 4. Apply format-specific transformations ───────────────────────────────
-  const hasAlpha = metadata.hasAlpha;
-
-  // Strip EXIF / metadata from all output formats (privacy hardening)
-  pipeline = pipeline.withMetadata(false);
-
-  switch (outputFormat) {
-    case 'jpg': {
-      // Flatten transparency onto bgColor before encoding as JPEG
-      pipeline = pipeline
-        .flatten({ background: bgColor })
-        .jpeg({ quality: jpgQuality });
-      break;
-    }
-
-    case 'png': {
-      pipeline = pipeline.png();
-      break;
-    }
-
-    case 'webp': {
-      if (hasAlpha) {
-        pipeline = pipeline.webp({ lossless: true });
+    worker.on('message', (result) => {
+      if (result.success) {
+        resolve({
+          buffer: Buffer.from(result.buffer),
+          outputName: result.outputName,
+          warnings: result.warnings,
+        });
       } else {
-        pipeline = pipeline.webp({ quality: 80 });
+        reject(new Error(result.error));
       }
-      break;
-    }
+    });
 
-    default:
-      throw new Error(`Unsupported output format: ${outputFormat}`);
-  }
-
-  const buffer = await pipeline.toBuffer();
-
-  // Derive output filename: replace extension
-  const extMap = { jpg: 'jpg', png: 'png', webp: 'webp' };
-  const outputExt = extMap[outputFormat];
-  const baseName = originalName.replace(/\.[^.]+$/, '');
-  const outputName = `${baseName}.${outputExt}`;
-
-  return { buffer, outputName, warnings };
+    worker.on('error', reject);
+    worker.on('exit', (code) => {
+      if (code !== 0) reject(new Error(`Worker stopped with exit code ${code}`));
+    });
+  });
 }
 
 module.exports = { convertImage };
