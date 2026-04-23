@@ -1,0 +1,83 @@
+'use strict';
+
+const express = require('express');
+const path = require('path');
+const fs = require('fs');
+
+const convertRouter = require('./routes/convert');
+
+// ── Ensure tmp directory exists ────────────────────────────────────────────
+const TMP_DIR = '/tmp/image-converter';
+fs.mkdirSync(TMP_DIR, { recursive: true });
+
+// ── App setup ──────────────────────────────────────────────────────────────
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Parse JSON bodies (for non-multipart routes)
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
+
+// ── Static files ───────────────────────────────────────────────────────────
+const PUBLIC_DIR = path.join(__dirname, 'public');
+app.use(express.static(PUBLIC_DIR));
+
+// Serve index.html at root
+app.get('/', (_req, res) => {
+  const indexPath = path.join(PUBLIC_DIR, 'index.html');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    res.status(200).send(`
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head><meta charset="UTF-8"><title>Image Converter</title></head>
+<body>
+  <h1>Image Converter API</h1>
+  <p>POST /api/convert — 上傳圖片並轉換格式</p>
+  <p>GET /download/:filename — 下載轉換後的圖片</p>
+</body>
+</html>
+    `.trim());
+  }
+});
+
+// ── API routes ─────────────────────────────────────────────────────────────
+app.use('/api', convertRouter);
+
+// Download route is mounted at root level for clean URLs (/download/:file)
+app.use('/', convertRouter);
+
+// ── 404 handler ───────────────────────────────────────────────────────────
+app.use((_req, res) => {
+  res.status(404).json({ error: '找不到該路由' });
+});
+
+// ── Global error handler ───────────────────────────────────────────────────
+// Catches multer errors (e.g. file too large, too many files) and other sync throws
+// eslint-disable-next-line no-unused-vars
+app.use((err, _req, res, _next) => {
+  console.error('[Global error handler]', err.message);
+
+  // Multer-specific error codes
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ error: '單一檔案超過大小限制（最大 50MB）' });
+  }
+  if (err.code === 'LIMIT_FILE_COUNT') {
+    return res.status(400).json({ error: `檔案數量超過限制（最多 ${50} 個）` });
+  }
+  if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+    return res.status(400).json({ error: '非預期的欄位名稱，請使用 files[]' });
+  }
+
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({ error: err.message || '伺服器內部錯誤' });
+});
+
+// ── Start server ───────────────────────────────────────────────────────────
+app.listen(PORT, () => {
+  console.log(`[image-converter] Server listening on http://localhost:${PORT}`);
+  console.log(`[image-converter] Temp files: ${TMP_DIR}`);
+});
+
+module.exports = app; // export for testing

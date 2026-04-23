@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>圖片格式轉換</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <!-- Header -->
+    <header class="header">
+      <div class="header-inner">
+        <div class="logo">
+          <svg width="28" height="28" viewBox="0 0 28 28" fill="none" aria-hidden="true">
+            <rect width="28" height="28" rx="8" fill="#6c63ff"/>
+            <path d="M7 20L12 13L16 17L19 12L21 20H7Z" fill="white" opacity="0.9"/>
+            <circle cx="10" cy="10" r="2.5" fill="white" opacity="0.9"/>
+          </svg>
+          <span class="logo-text">ImageConvert</span>
+        </div>
+        <p class="header-desc">支援 WebP、AVIF、PNG、JPG 格式互轉</p>
+      </div>
+    </header>
+
+    <main class="main">
+      <!-- Upload Section -->
+      <section class="card upload-section" aria-label="上傳檔案">
+        <div
+          id="dropZone"
+          class="drop-zone"
+          role="button"
+          tabindex="0"
+          aria-label="拖曳或點擊選擇圖片檔案"
+        >
+          <div class="drop-zone-content">
+            <div class="drop-icon" aria-hidden="true">
+              <svg width="56" height="56" viewBox="0 0 56 56" fill="none">
+                <circle cx="28" cy="28" r="28" fill="#6c63ff" opacity="0.12"/>
+                <path d="M28 16V36M20 24L28 16L36 24" stroke="#6c63ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                <path d="M18 40H38" stroke="#6c63ff" stroke-width="2.5" stroke-linecap="round"/>
+              </svg>
+            </div>
+            <p class="drop-primary">拖曳圖片到這裡，或 <span class="drop-link">點擊選擇</span></p>
+            <p class="drop-secondary">支援 WebP、AVIF、PNG、JPG・最多 50 個檔案・單檔最大 20 MB</p>
+          </div>
+          <input
+            type="file"
+            id="fileInput"
+            accept=".webp,.avif,.png,.jpg,.jpeg,image/webp,image/avif,image/png,image/jpeg"
+            multiple
+            aria-hidden="true"
+            tabindex="-1"
+          />
+        </div>
+
+        <!-- File List -->
+        <div id="fileList" class="file-list" aria-label="已選擇的檔案" hidden></div>
+
+        <!-- Error Banner -->
+        <div id="uploadError" class="error-banner" role="alert" hidden></div>
+      </section>
+
+      <!-- Options Section -->
+      <section class="card options-section" aria-label="輸出選項">
+        <h2 class="section-title">輸出格式</h2>
+
+        <div class="format-buttons" role="group" aria-label="選擇輸出格式">
+          <button class="format-btn" data-format="png" aria-pressed="false">PNG</button>
+          <button class="format-btn active" data-format="jpg" aria-pressed="true">JPG</button>
+          <button class="format-btn" data-format="webp" aria-pressed="false">WebP</button>
+        </div>
+
+        <!-- JPG Options -->
+        <div id="jpgOptions" class="jpg-options">
+          <!-- Quality Slider -->
+          <div class="option-group">
+            <label class="option-label" for="qualitySlider">
+              JPG 品質
+              <span id="qualityValue" class="quality-value">85</span>
+            </label>
+            <div class="slider-row">
+              <span class="slider-label">60</span>
+              <input
+                type="range"
+                id="qualitySlider"
+                min="60"
+                max="100"
+                value="85"
+                class="slider"
+                aria-valuemin="60"
+                aria-valuemax="100"
+                aria-valuenow="85"
+                aria-label="JPG 品質"
+              />
+              <span class="slider-label">100</span>
+            </div>
+          </div>
+
+          <!-- Background Color (shown only when transparency detected) -->
+          <div id="bgColorGroup" class="option-group bg-color-group" hidden>
+            <div class="bg-color-notice" role="note">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <circle cx="8" cy="8" r="7.5" stroke="#f59e0b" stroke-width="1.2"/>
+                <path d="M8 5V8.5" stroke="#f59e0b" stroke-width="1.5" stroke-linecap="round"/>
+                <circle cx="8" cy="11" r="0.75" fill="#f59e0b"/>
+              </svg>
+              此圖片含透明背景，轉換為 JPG 時請選擇填色
+            </div>
+            <div class="bg-color-picker" role="group" aria-label="背景填色">
+              <button class="color-btn active" data-color="#ffffff" aria-pressed="true" aria-label="白色背景">
+                <span class="color-swatch" style="background:#ffffff;"></span>
+                白色
+              </button>
+              <button class="color-btn" data-color="#000000" aria-pressed="false" aria-label="黑色背景">
+                <span class="color-swatch" style="background:#000000;"></span>
+                黑色
+              </button>
+              <label class="color-btn color-custom-label" aria-label="自訂背景顏色">
+                <span class="color-swatch" id="customColorSwatch" style="background:#ff6b6b;"></span>
+                自訂
+                <input type="color" id="customColorInput" value="#ff6b6b" aria-label="自訂顏色" />
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Convert Button -->
+      <div class="convert-row">
+        <button id="convertBtn" class="convert-btn" disabled>
+          <span class="convert-btn-text">開始轉換</span>
+          <span class="convert-btn-spinner" aria-hidden="true" hidden>
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+              <circle cx="10" cy="10" r="8" stroke="white" stroke-width="2" stroke-dasharray="40" stroke-dashoffset="15" stroke-linecap="round"/>
+            </svg>
+          </span>
+        </button>
+      </div>
+
+      <!-- Progress Section -->
+      <section id="progressSection" class="card progress-section" hidden aria-label="轉換進度" aria-live="polite">
+        <h2 class="section-title">轉換中…</h2>
+        <div id="progressList" class="progress-list"></div>
+      </section>
+
+      <!-- Results Section -->
+      <section id="resultsSection" class="card results-section" hidden aria-label="轉換結果">
+        <div class="results-header">
+          <h2 class="section-title">轉換結果</h2>
+          <button id="downloadAllBtn" class="download-all-btn">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M8 2V10M4 7L8 11L12 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+              <path d="M2 13H14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+            </svg>
+            全部下載
+          </button>
+        </div>
+        <div id="resultsList" class="results-list"></div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>檔案僅在本次工作階段暫存，關閉頁面後自動清除</p>
+    </footer>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
