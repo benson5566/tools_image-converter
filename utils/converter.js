@@ -11,21 +11,21 @@ const WORKER_PATH = path.join(__dirname, '../workers/converter-worker.js');
  */
 function convertImage(inputBuffer, originalName, options = {}) {
   return new Promise((resolve, reject) => {
+    // Build a single ArrayBuffer slice and reuse the same reference for both
+    // workerData and transferList. This ensures the buffer is truly transferred
+    // (zero-copy) rather than copied via structured clone.
+    const arrayBuffer = inputBuffer.buffer.slice(
+      inputBuffer.byteOffset,
+      inputBuffer.byteOffset + inputBuffer.byteLength
+    );
+
     const worker = new Worker(WORKER_PATH, {
       workerData: {
-        inputBuffer: inputBuffer.buffer.slice(
-          inputBuffer.byteOffset,
-          inputBuffer.byteOffset + inputBuffer.byteLength
-        ),
+        inputBuffer: arrayBuffer,
         originalName,
         options,
       },
-      transferList: [
-        inputBuffer.buffer.slice(
-          inputBuffer.byteOffset,
-          inputBuffer.byteOffset + inputBuffer.byteLength
-        ),
-      ],
+      transferList: [arrayBuffer],
     });
 
     worker.on('message', (result) => {
