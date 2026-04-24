@@ -35,7 +35,7 @@ function securityHeaders(req, res, next) {
   // CSP: allow same-origin resources + Cloudflare Turnstile challenge scripts/frames
   res.setHeader(
     'Content-Security-Policy',
-    "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com"
+    "default-src 'self'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; script-src 'self' https://challenges.cloudflare.com; frame-src https://challenges.cloudflare.com"
   );
 
   // Legacy XSS filter for older browsers

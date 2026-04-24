@@ -705,6 +705,15 @@ window.onTurnstileExpired = function() {
   turnstileToken = null;
   updateConvertBtn();
 };
+// Widget fails to load (wrong domain, network error, etc.)
+// Backend skips verification when TURNSTILE_SECRET_KEY is not set,
+// so bypassing here is safe in that configuration.
+window.onTurnstileError = function() {
+  const wrapper = document.querySelector('.turnstile-wrapper');
+  if (wrapper) wrapper.hidden = true;
+  turnstileToken = 'widget-error-bypass';
+  updateConvertBtn();
+};
 
 // ── Init ──────────────────────────────────────
 
