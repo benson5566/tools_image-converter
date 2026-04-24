@@ -99,10 +99,13 @@ app.use((err, _req, res, _next) => {
     return res.status(413).json({ error: '單一檔案超過大小限制（最大 50MB）' });
   }
   if (err.code === 'LIMIT_FILE_COUNT') {
-    return res.status(400).json({ error: '檔案數量超過限制（最多 50 個）' });
+    return res.status(429).json({ error: '檔案數量超過限制（最多 50 個）' });
   }
   if (err.code === 'LIMIT_UNEXPECTED_FILE') {
     return res.status(400).json({ error: '非預期的欄位名稱，請使用 files[]' });
+  }
+  if (err.code === 'UNSUPPORTED_MEDIA_TYPE') {
+    return res.status(415).json({ error: err.message });
   }
 
   // Do NOT expose err.message to the client — it may contain internal paths,

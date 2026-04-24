@@ -93,7 +93,10 @@ const upload = multer({
     if (SUPPORTED_INPUT_MIMES.has(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error(`不支援的檔案類型：${file.mimetype}`));
+      const err = new Error(`不支援的檔案類型：${file.mimetype}`);
+      err.code = 'UNSUPPORTED_MEDIA_TYPE';
+      err.expose = true;
+      cb(err);
     }
   },
 });
@@ -317,7 +320,7 @@ router.get('/download/:filename', async (req, res) => {
   // Ensure the resolved path is still within TMP_DIR (path traversal guard)
   const resolved = path.resolve(filePath);
   if (!resolved.startsWith(path.resolve(TMP_DIR) + path.sep)) {
-    return res.status(400).json({ error: '無效的路徑' });
+    return res.status(403).json({ error: '存取被拒：路徑不合法' });
   }
 
   try {
@@ -367,7 +370,7 @@ router.post('/zip', async (req, res) => {
       const filePath = path.join(TMP_DIR, filename);
       const resolved = path.resolve(filePath);
       if (!resolved.startsWith(path.resolve(TMP_DIR) + path.sep)) {
-        return res.status(400).json({ error: '無效的路徑' });
+        return res.status(403).json({ error: '存取被拒：路徑不合法' });
       }
       try {
         await fsp.access(filePath, fs.constants.R_OK);
