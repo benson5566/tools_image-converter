@@ -28,7 +28,16 @@ function convertImage(inputBuffer, originalName, options = {}) {
       transferList: [arrayBuffer],
     });
 
+    // Kill the worker if it takes too long (hung libvips decode, decompression
+    // bomb that slipped through the size estimate, etc.).
+    const TIMEOUT_MS = 60_000; // 60 seconds per image
+    const timer = setTimeout(() => {
+      worker.terminate();
+      reject(new Error('圖片轉換逾時，請確認圖片未損毀後再試'));
+    }, TIMEOUT_MS);
+
     worker.on('message', (result) => {
+      clearTimeout(timer);
       if (result.success) {
         resolve({
           buffer: Buffer.from(result.buffer),
@@ -40,8 +49,9 @@ function convertImage(inputBuffer, originalName, options = {}) {
       }
     });
 
-    worker.on('error', reject);
+    worker.on('error', (err) => { clearTimeout(timer); reject(err); });
     worker.on('exit', (code) => {
+      clearTimeout(timer);
       if (code !== 0) reject(new Error(`Worker stopped with exit code ${code}`));
     });
   });

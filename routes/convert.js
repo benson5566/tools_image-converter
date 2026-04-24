@@ -63,13 +63,17 @@ function detectMagicBytes(buf) {
     return 'webp';
   }
 
-  // AVIF: offset 4 = "ftyp", offset 8 = "avif" (case-insensitive)
+  // AVIF / AVIF-sequence: offset 4 = "ftyp", offset 8 = major brand.
+  // Valid brands include "avif" (still) and "avis" (AVIF Image Sequence).
+  // See ISO/IEC 14496-12 and AV1 Image File Format specification.
   if (
     buf.length >= 12 &&
-    buf.slice(4, 8).toString('ascii') === 'ftyp' &&
-    buf.slice(8, 12).toString('ascii').toLowerCase() === 'avif'
+    buf.slice(4, 8).toString('ascii') === 'ftyp'
   ) {
-    return 'avif';
+    const brand = buf.slice(8, 12).toString('ascii').toLowerCase();
+    if (brand === 'avif' || brand === 'avis') {
+      return 'avif';
+    }
   }
 
   return null;
@@ -86,7 +90,7 @@ const upload = multer({
     fileSize: MAX_FILE_SIZE,
   },
   fileFilter(_req, file, cb) {
-    if (SUPPORTED_INPUT_MIMES.has(file.mimetype) || file.mimetype === 'application/octet-stream') {
+    if (SUPPORTED_INPUT_MIMES.has(file.mimetype)) {
       cb(null, true);
     } else {
       cb(new Error(`不支援的檔案類型：${file.mimetype}`));
@@ -191,7 +195,7 @@ router.post(
 
             // 2. Dimension check via Sharp metadata
             const meta = await sharp(buffer, { failOn: 'none' }).metadata();
-            const { width, height } = meta;
+            const { width, height, channels } = meta;
             if (
               width === undefined || height === undefined ||
               width > MAX_DIMENSION || height > MAX_DIMENSION
@@ -203,6 +207,23 @@ router.post(
                 warnings: [],
                 success: false,
                 error: `圖片尺寸超過限制（最大 ${MAX_DIMENSION}×${MAX_DIMENSION}px），實際：${width}×${height}px`,
+              };
+            }
+
+            // 2b. Decompression-bomb guard (SPEC 8.3).
+            // Estimate uncompressed RGBA memory: width × height × 4 channels × 1 byte.
+            // Even if the source has fewer channels, Sharp internally promotes to RGBA,
+            // so 4 is the safe upper bound for the channel count.
+            const MAX_UNCOMPRESSED_BYTES = 50 * 1024 * 1024; // 50 MB
+            const estimatedBytes = (width || 0) * (height || 0) * Math.max(channels || 4, 4);
+            if (estimatedBytes > MAX_UNCOMPRESSED_BYTES) {
+              return {
+                originalName: originalname,
+                outputName: null,
+                downloadUrl: null,
+                warnings: [],
+                success: false,
+                error: `解壓後記憶體估算（${(estimatedBytes / 1024 / 1024).toFixed(1)}MB）超過限制（最大 50MB），請縮小圖片後再試`,
               };
             }
 
@@ -285,7 +306,9 @@ router.get('/download/:filename', async (req, res) => {
   // Use the human-readable name from query param if provided (URL-encoded),
   // otherwise fall back to the stored filename.
   const rawName = req.query.name;
-  const downloadName = rawName ? decodeURIComponent(rawName) : filename;
+  const downloadName = rawName
+    ? decodeURIComponent(rawName).replace(/[\r\n\t]/g, '_')
+    : filename;
 
   res.download(filePath, downloadName, async (err) => {
     if (err) {

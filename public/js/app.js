@@ -147,7 +147,14 @@ function validateFiles(incoming) {
 
 // ── Render file list ─────────────────────────
 
+// Track file-list thumbnail Object URLs so they can be cleaned up on re-render
+const _fileThumbUrls = [];
+
 function renderFileList() {
+  // Revoke previous file-list thumbnail Object URLs before re-rendering
+  _fileThumbUrls.forEach(u => URL.revokeObjectURL(u));
+  _fileThumbUrls.length = 0;
+
   if (selectedFiles.length === 0) {
     fileList.hidden = true;
     fileList.innerHTML = '';
@@ -158,10 +165,10 @@ function renderFileList() {
   fileList.hidden = false;
   fileList.innerHTML = selectedFiles.map((file, idx) => {
     const thumb = URL.createObjectURL(file);
+    _fileThumbUrls.push(thumb);
     return `
       <div class="file-item" data-idx="${idx}">
         <img class="file-thumb" src="${escapeHtml(thumb)}" alt="" loading="lazy"
-             onload="URL.revokeObjectURL(this.src)"
              onerror="this.outerHTML='<div class=\\'file-thumb-placeholder\\'>${escapeHtml(ext(file.name).replace('.', '').toUpperCase())}</div>'" />
         <div class="file-info">
           <div class="file-name" title="${escapeHtml(file.name)}">${escapeHtml(file.name)}</div>
@@ -180,6 +187,7 @@ function renderFileList() {
 }
 
 function removeFile(idx) {
+  if (isConverting) return; // block file changes while a conversion is in progress
   selectedFiles.splice(idx, 1);
   renderFileList();
   if (outputFormat === 'jpg') detectTransparency();
@@ -188,6 +196,7 @@ function removeFile(idx) {
 // ── Add files ────────────────────────────────
 
 async function addFiles(newFiles) {
+  if (isConverting) return; // block file changes while a conversion is in progress
   clearError();
   const { valid, errors } = validateFiles(Array.from(newFiles));
 
@@ -338,7 +347,7 @@ function setConverting(val) {
   isConverting = val;
   convertBtnText.hidden = val;
   convertBtnSpinner.hidden = !val;
-  convertBtn.disabled = val || selectedFiles.length === 0;
+  updateConvertBtn();
 }
 
 function buildProgressItems(files) {
@@ -375,7 +384,7 @@ function setProgressDone(i, success, msg) {
   }
 }
 
-// Track object URLs so we can revoke them later to free memory
+// Track result-card thumbnail Object URLs so we can revoke them later to free memory
 const _thumbUrls = [];
 
 function renderResults(results) {
@@ -529,7 +538,7 @@ downloadAllBtn.addEventListener('click', () => {
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-    }, i * 120);
+    }, i * 200);
   });
 });
 
@@ -551,6 +560,9 @@ window.onTurnstileExpired = function() {
 const cfWidget = document.querySelector('.cf-turnstile');
 if (cfWidget && cfWidget.dataset.sitekey === '0x4AAAAAAA_PLACEHOLDER') {
   turnstileToken = 'dev-bypass';
+  // Hide the widget wrapper so the placeholder UI doesn't confuse users in dev
+  const turnstileWrapper = document.querySelector('.turnstile-wrapper');
+  if (turnstileWrapper) turnstileWrapper.hidden = true;
 }
 
 updateConvertBtn();

@@ -848,6 +848,10 @@ body {
 /* =============================================
    Turnstile
    ============================================= */
+
+/* Ensure [hidden] always wins over flex display */
+[hidden] { display: none !important; }
+
 .turnstile-wrapper {
   display: flex;
   flex-direction: column;

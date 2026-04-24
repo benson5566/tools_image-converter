@@ -52,10 +52,18 @@ async function run() {
 
   const outBuf = await pipeline.toBuffer();
   const ext = { jpg: 'jpg', png: 'png', webp: 'webp' }[outputFormat];
-  const baseName = originalName.replace(/\.[^.]+$/, '');
+  const baseName = originalName
+    .replace(/\.[^.]+$/, '')
+    .replace(/[/\\?%*:|"<>]/g, '_')
+    .slice(0, 200);
   const outputName = `${baseName}.${ext}`;
 
-  parentPort.postMessage({ success: true, buffer: outBuf, outputName, warnings });
+  // Transfer the underlying ArrayBuffer (zero-copy) instead of structured-clone copy
+  const outArrayBuffer = outBuf.buffer.slice(outBuf.byteOffset, outBuf.byteOffset + outBuf.byteLength);
+  parentPort.postMessage(
+    { success: true, buffer: outArrayBuffer, outputName, warnings },
+    [outArrayBuffer],
+  );
 }
 
 run().catch(err => {
