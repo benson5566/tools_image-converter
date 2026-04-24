@@ -11,6 +11,7 @@ async function run() {
   const {
     outputFormat,
     jpgQuality = 85,
+    avifQuality = 50,
     bgColor = '#ffffff',
   } = options;
 
@@ -46,12 +47,15 @@ async function run() {
     case 'webp':
       pipeline = hasAlpha ? pipeline.webp({ lossless: true }) : pipeline.webp({ quality: 80 });
       break;
+    case 'avif':
+      pipeline = pipeline.avif({ quality: avifQuality, effort: 4 });
+      break;
     default:
       throw new Error(`Unsupported format: ${outputFormat}`);
   }
 
   const outBuf = await pipeline.toBuffer();
-  const ext = { jpg: 'jpg', png: 'png', webp: 'webp' }[outputFormat];
+  const ext = { jpg: 'jpg', png: 'png', webp: 'webp', avif: 'avif' }[outputFormat];
   const baseName = originalName
     .replace(/\.[^.]+$/, '')
     .replace(/[/\\?%*:|"<>]/g, '_')

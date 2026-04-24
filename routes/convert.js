@@ -28,7 +28,7 @@ const SUPPORTED_INPUT_MIMES = new Set([
   'application/octet-stream', // curl 等工具未指定 type 時的 fallback，magic bytes 負責實際驗證
 ]);
 
-const SUPPORTED_OUTPUT_FORMATS = new Set(['png', 'jpg', 'webp']);
+const SUPPORTED_OUTPUT_FORMATS = new Set(['png', 'jpg', 'webp', 'avif']);
 
 // Ensure tmp directory exists
 fs.mkdirSync(TMP_DIR, { recursive: true });
@@ -154,7 +154,7 @@ router.post(
       const outputFormat = (req.body.outputFormat || '').toLowerCase();
       if (!SUPPORTED_OUTPUT_FORMATS.has(outputFormat)) {
         return res.status(400).json({
-          error: '不支援的輸出格式，請使用 png、jpg 或 webp',
+          error: '不支援的輸出格式，請使用 png、jpg、webp 或 avif',
         });
       }
 
@@ -166,6 +166,15 @@ router.post(
           return res.status(400).json({
             error: 'jpgQuality 必須為 60–100 之間的整數',
           });
+        }
+      }
+
+      // Parse and validate avifQuality
+      let avifQuality = 50;
+      if (req.body.avifQuality !== undefined) {
+        avifQuality = parseInt(req.body.avifQuality, 10);
+        if (isNaN(avifQuality) || avifQuality < 1 || avifQuality > 63) {
+          return res.status(400).json({ error: 'avifQuality 必須為 1–63 之間的整數' });
         }
       }
 
@@ -234,14 +243,14 @@ router.post(
             const { buffer: outBuf, outputName, warnings } = await convertImage(
               buffer,
               originalname,
-              { outputFormat, jpgQuality, bgColor },
+              { outputFormat, jpgQuality, avifQuality, bgColor },
             );
 
             // 4. Write to tmp with UUID prefix to avoid collisions
             // Use only UUID + extension for the stored filename to ensure
             // filesystem and URL safety regardless of original filename encoding.
             const uuid = uuidv4();
-            const ext = outputFormat; // 'png' | 'jpg' | 'webp'
+            const ext = outputFormat; // 'png' | 'jpg' | 'webp' | 'avif'
             const storedName = `${uuid}.${ext}`;
             const storedPath = path.join(TMP_DIR, storedName);
             await fsp.writeFile(storedPath, outBuf);
@@ -260,6 +269,8 @@ router.post(
               downloadUrl: `/download/${storedName}?name=${encodedOutputName}`,
               warnings,
               success: true,
+              originalSize: buffer.byteLength,
+              outputSize: outBuf.length,
             };
           } catch (err) {
             return {
