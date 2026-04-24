@@ -70,6 +70,7 @@
           <button class="format-btn" data-format="png" aria-pressed="false">PNG</button>
           <button class="format-btn active" data-format="jpg" aria-pressed="true">JPG</button>
           <button class="format-btn" data-format="webp" aria-pressed="false">WebP</button>
+          <button class="format-btn" data-format="avif" aria-pressed="false">AVIF</button>
         </div>
 
         <!-- JPG Options -->
@@ -124,6 +125,48 @@
               </label>
             </div>
           </div>
+        </div>
+
+        <!-- AVIF Options -->
+        <div id="avifOptions" class="avif-options" hidden>
+          <div class="option-group">
+            <label class="option-label" for="avifQualitySlider">
+              AVIF 品質
+              <span id="avifQualityValue" class="quality-value">50</span>
+            </label>
+            <div class="slider-row">
+              <span class="slider-label">1</span>
+              <input type="range" id="avifQualitySlider" min="1" max="63" value="50"
+                class="slider" aria-valuemin="1" aria-valuemax="63" aria-valuenow="50"
+                aria-label="AVIF 品質" />
+              <span class="slider-label">63</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- WebP Options -->
+        <div id="webpOptions" class="webp-options" hidden>
+          <div class="option-group">
+            <label class="option-label" for="webpQualitySlider">
+              WebP 品質
+              <span id="webpQualityValue" class="quality-value">80</span>
+            </label>
+            <div class="slider-row">
+              <span class="slider-label">1</span>
+              <input type="range" id="webpQualitySlider" min="1" max="100" value="80"
+                class="slider" aria-valuemin="1" aria-valuemax="100" aria-valuenow="80"
+                aria-label="WebP 品質" />
+              <span class="slider-label">100</span>
+            </div>
+          </div>
+          <p id="webpLosslessNote" class="webp-lossless-note" hidden>
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" style="flex-shrink:0" aria-hidden="true">
+              <circle cx="8" cy="8" r="7.5" stroke="#6c63ff" stroke-width="1.2"/>
+              <path d="M8 5V8.5" stroke="#6c63ff" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="8" cy="11" r="0.75" fill="#6c63ff"/>
+            </svg>
+            含透明背景的圖片將自動以無損模式輸出，品質設定不影響無損圖片
+          </p>
         </div>
       </section>
 

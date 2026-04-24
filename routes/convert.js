@@ -339,4 +339,74 @@ router.get('/download/:filename', async (req, res) => {
   });
 });
 
+// ── POST /api/zip – Batch ZIP download ─────────────────────────────────────
+const archiver = require('archiver');
+
+router.post('/zip', async (req, res) => {
+  try {
+    const { files } = req.body;
+    if (!Array.isArray(files)) return res.status(400).json({ error: 'files 必須為陣列' });
+    if (files.length < 1 || files.length > 50) return res.status(400).json({ error: 'files 陣列長度必須為 1–50' });
+
+    const validatedFiles = [];
+    const missingFiles = [];
+
+    for (const filename of files) {
+      if (!/^[a-zA-Z0-9\-\.]+$/.test(filename)) {
+        return res.status(400).json({ error: `無效的檔案名稱格式：${filename}` });
+      }
+      const filePath = path.join(TMP_DIR, filename);
+      const resolved = path.resolve(filePath);
+      if (!resolved.startsWith(path.resolve(TMP_DIR) + path.sep)) {
+        return res.status(400).json({ error: '無效的路徑' });
+      }
+      try {
+        await fsp.access(filePath, fs.constants.R_OK);
+        validatedFiles.push({ filename, filePath });
+      } catch {
+        missingFiles.push(filename);
+      }
+    }
+
+    if (missingFiles.length > 0 && validatedFiles.length === 0) {
+      return res.status(404).json({ error: '所有請求的檔案不存在或已過期' });
+    }
+
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', 'attachment; filename="images.zip"');
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+
+    archive.on('error', (err) => {
+      logger.error('zip archive error', { message: err.message, ip: req.ip });
+      if (!res.headersSent) {
+        res.status(500).json({ error: '打包時發生錯誤' });
+      } else {
+        res.destroy();
+      }
+    });
+
+    archive.pipe(res);
+
+    for (const { filename, filePath } of validatedFiles) {
+      try {
+        archive.append(fs.createReadStream(filePath), { name: filename });
+      } catch (err) {
+        logger.error('zip append error', { file: filename, message: err.message });
+      }
+    }
+
+    if (missingFiles.length > 0) {
+      const notice = `以下檔案已過期或不存在，未包含在此 ZIP 中：\n${missingFiles.join('\n')}`;
+      archive.append(notice, { name: '_MISSING_FILES.txt' });
+    }
+
+    await archive.finalize();
+    logger.info('zip download', { files: validatedFiles.length, missing: missingFiles.length, ip: req.ip });
+  } catch (err) {
+    logger.error('zip unhandled error', { message: err.message, ip: req.ip });
+    if (!res.headersSent) res.status(500).json({ error: '伺服器內部錯誤' });
+  }
+});
+
 module.exports = router;

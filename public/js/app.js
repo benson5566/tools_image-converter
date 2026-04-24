@@ -15,6 +15,8 @@ const ACCEPTED_EXT   = new Set(['.webp', '.avif', '.png', '.jpg', '.jpeg']);
 let selectedFiles   = [];   // File[]
 let outputFormat    = 'jpg';
 let jpgQuality      = 85;
+let avifQuality     = 50;
+let webpQuality     = 80;
 let bgColor         = '#ffffff';
 let hasTransparent  = false; // any selected file has alpha
 let isConverting    = false;
@@ -31,6 +33,13 @@ const jpgOptions       = document.getElementById('jpgOptions');
 const qualitySlider    = document.getElementById('qualitySlider');
 const qualityValue     = document.getElementById('qualityValue');
 const bgColorGroup     = document.getElementById('bgColorGroup');
+const avifOptions      = document.getElementById('avifOptions');
+const avifQualitySlider= document.getElementById('avifQualitySlider');
+const avifQualityValue = document.getElementById('avifQualityValue');
+const webpOptions      = document.getElementById('webpOptions');
+const webpQualitySlider= document.getElementById('webpQualitySlider');
+const webpQualityValue = document.getElementById('webpQualityValue');
+const webpLosslessNote = document.getElementById('webpLosslessNote');
 const colorBtns        = document.querySelectorAll('.color-btn[data-color]');
 const customColorLabel = document.querySelector('.color-custom-label');
 const customColorInput = document.getElementById('customColorInput');
@@ -190,7 +199,7 @@ function removeFile(idx) {
   if (isConverting) return; // block file changes while a conversion is in progress
   selectedFiles.splice(idx, 1);
   renderFileList();
-  if (outputFormat === 'jpg') detectTransparency();
+  detectTransparency();
 }
 
 // ── Add files ────────────────────────────────
@@ -206,22 +215,34 @@ async function addFiles(newFiles) {
   selectedFiles.push(...valid);
   renderFileList();
 
-  // Re-run transparency detection for JPG
-  if (outputFormat === 'jpg') await detectTransparency();
+  // Re-run transparency detection
+  await detectTransparency();
 }
 
 // ── Transparency detection ───────────────────
 
 async function detectTransparency() {
-  if (outputFormat !== 'jpg' || selectedFiles.length === 0) {
+  if (selectedFiles.length === 0) {
     bgColorGroup.hidden = true;
+    if (webpLosslessNote) webpLosslessNote.hidden = true;
     hasTransparent = false;
     return;
   }
-
   const results = await Promise.all(selectedFiles.map(f => hasTransparency(f)));
   hasTransparent = results.some(Boolean);
-  bgColorGroup.hidden = !hasTransparent;
+  if (outputFormat === 'jpg') {
+    bgColorGroup.hidden = !hasTransparent;
+    if (webpLosslessNote) webpLosslessNote.hidden = true;
+  } else if (outputFormat === 'webp') {
+    bgColorGroup.hidden = true;
+    if (webpLosslessNote) {
+      webpLosslessNote.hidden = !hasTransparent;
+      webpQualitySlider.disabled = hasTransparent;
+    }
+  } else {
+    bgColorGroup.hidden = true;
+    if (webpLosslessNote) webpLosslessNote.hidden = true;
+  }
 }
 
 // ── Format selection ─────────────────────────
@@ -235,12 +256,28 @@ formatBtns.forEach(btn => {
       b.setAttribute('aria-pressed', b === btn ? 'true' : 'false');
     });
 
-    // Show/hide JPG-specific options
+    // Show/hide format-specific options
     if (outputFormat === 'jpg') {
       jpgOptions.hidden = false;
+      avifOptions.hidden = true;
+      webpOptions.hidden = true;
+      await detectTransparency();
+    } else if (outputFormat === 'avif') {
+      jpgOptions.hidden = true;
+      avifOptions.hidden = false;
+      webpOptions.hidden = true;
+      bgColorGroup.hidden = true;
+      hasTransparent = false;
+    } else if (outputFormat === 'webp') {
+      jpgOptions.hidden = true;
+      avifOptions.hidden = true;
+      webpOptions.hidden = false;
       await detectTransparency();
     } else {
+      // png
       jpgOptions.hidden = true;
+      avifOptions.hidden = true;
+      webpOptions.hidden = true;
       bgColorGroup.hidden = true;
       hasTransparent = false;
     }
@@ -249,6 +286,8 @@ formatBtns.forEach(btn => {
 
 // Start with JPG selected and options visible
 jpgOptions.hidden = false;
+avifOptions.hidden = true;
+webpOptions.hidden = true;
 
 // ── Quality slider ────────────────────────────
 
@@ -265,6 +304,34 @@ qualitySlider.addEventListener('input', () => {
 });
 
 updateSliderTrack(); // initial
+
+// ── AVIF quality slider ───────────────────────
+
+function updateAvifSliderTrack() {
+  const pct = ((avifQuality - 1) / 62) * 100;
+  avifQualitySlider.style.setProperty('--pct', pct + '%');
+}
+avifQualitySlider.addEventListener('input', () => {
+  avifQuality = parseInt(avifQualitySlider.value, 10);
+  avifQualityValue.textContent = avifQuality;
+  avifQualitySlider.setAttribute('aria-valuenow', avifQuality);
+  updateAvifSliderTrack();
+});
+updateAvifSliderTrack();
+
+// ── WebP quality slider ───────────────────────
+
+function updateWebpSliderTrack() {
+  const pct = ((webpQuality - 1) / 99) * 100;
+  webpQualitySlider.style.setProperty('--pct', pct + '%');
+}
+webpQualitySlider.addEventListener('input', () => {
+  webpQuality = parseInt(webpQualitySlider.value, 10);
+  webpQualityValue.textContent = webpQuality;
+  webpQualitySlider.setAttribute('aria-valuenow', webpQuality);
+  updateWebpSliderTrack();
+});
+updateWebpSliderTrack();
 
 // ── Background color picker ──────────────────
 
@@ -468,6 +535,10 @@ convertBtn.addEventListener('click', async () => {
   if (outputFormat === 'jpg') {
     formData.append('jpgQuality', String(jpgQuality));
     if (hasTransparent) formData.append('bgColor', bgColor);
+  } else if (outputFormat === 'avif') {
+    formData.append('avifQuality', String(avifQuality));
+  } else if (outputFormat === 'webp') {
+    formData.append('webpQuality', String(webpQuality));
   }
 
   if (turnstileToken) {
