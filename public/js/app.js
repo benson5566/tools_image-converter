@@ -6,7 +6,7 @@
 
 // ── Constants ────────────────────────────────
 const MAX_FILES = 50;
-const MAX_FILE_SIZE_MB = 20;
+const MAX_FILE_SIZE_MB = 50;
 const MAX_FILE_SIZE = MAX_FILE_SIZE_MB * 1024 * 1024;
 const ACCEPTED_TYPES = new Set(['image/webp', 'image/avif', 'image/png', 'image/jpeg']);
 const ACCEPTED_EXT   = new Set(['.webp', '.avif', '.png', '.jpg', '.jpeg']);
@@ -395,10 +395,7 @@ function renderResults(results) {
       `;
     } else {
       const badges = (res.warnings || []).map(w => {
-        let text = w;
-        if (w === 'animated_webp') text = '僅保留第一幀';
-        else if (w === 'avif_hdr') text = '顏色可能略有差異';
-        return `<span class="badge badge-warning">${escapeHtml(text)}</span>`;
+        return `<span class="badge badge-warning">${escapeHtml(w)}</span>`;
       }).join('');
 
       const thumbSrc = res.thumbnailUrl || res.downloadUrl;
@@ -535,5 +532,12 @@ window.onTurnstileExpired = function() {
 };
 
 // ── Init ──────────────────────────────────────
+
+// If Turnstile is using the placeholder key (dev/staging), bypass token requirement
+// so the convert button is usable without a real Cloudflare account.
+const cfWidget = document.querySelector('.cf-turnstile');
+if (cfWidget && cfWidget.dataset.sitekey === '0x4AAAAAAA_PLACEHOLDER') {
+  turnstileToken = 'dev-bypass';
+}
 
 updateConvertBtn();
