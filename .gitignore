@@ -1,1 +1,6 @@
 node_modules/
+
+# TLS certificates
+certs/*.crt
+certs/*.key
+certs/*.pem

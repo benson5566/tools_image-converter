@@ -1,0 +1,43 @@
+version: '3.9'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    environment:
+      PORT: '3000'
+      NODE_ENV: 'development'
+      REDIS_URL: 'redis://redis:6379'
+      TURNSTILE_SECRET_KEY: '${TURNSTILE_SECRET_KEY:-}'
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - image_converter_tmp:/tmp/image-converter
+    ports:
+      - '3000:3000'
+      - '9229:9229'
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --loglevel debug
+    networks:
+      - internal
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  image_converter_tmp:
+
+networks:
+  internal:
+    driver: bridge
