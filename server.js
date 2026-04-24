@@ -41,6 +41,7 @@ app.use('/download', rateLimiter);
 
 // ── Request logging middleware ──────────────────────────────────────────────
 app.use((req, res, next) => {
+  if (req.path === '/health') return next();
   res.on('finish', () => {
     logger.info('request', { method: req.method, path: req.path, status: res.statusCode, ip: req.ip });
   });
@@ -69,6 +70,11 @@ app.get('/', (_req, res) => {
 </html>
     `.trim());
   }
+});
+
+// ── Health check ───────────────────────────────────────────────────────────
+app.get('/health', (_req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString(), uptime: process.uptime() });
 });
 
 // ── API routes ─────────────────────────────────────────────────────────────

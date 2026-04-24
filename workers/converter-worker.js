@@ -12,6 +12,7 @@ async function run() {
     outputFormat,
     jpgQuality = 85,
     avifQuality = 50,
+    webpQuality = 80,
     bgColor = '#ffffff',
   } = options;
 
@@ -45,7 +46,7 @@ async function run() {
       pipeline = pipeline.png();
       break;
     case 'webp':
-      pipeline = hasAlpha ? pipeline.webp({ lossless: true }) : pipeline.webp({ quality: 80 });
+      pipeline = hasAlpha ? pipeline.webp({ lossless: true }) : pipeline.webp({ quality: webpQuality });
       break;
     case 'avif':
       pipeline = pipeline.avif({ quality: avifQuality, effort: 4 });

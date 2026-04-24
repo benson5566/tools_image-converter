@@ -61,6 +61,17 @@ function formatBytes(bytes) {
   return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
 }
 
+function formatExtension(filename) {
+  const map = { '.png':'PNG', '.jpg':'JPG', '.jpeg':'JPG', '.webp':'WebP', '.avif':'AVIF' };
+  return map[ext(filename).toLowerCase()] || '原始';
+}
+
+function calculateSavings(original, output) {
+  if (original === 0) return { percent: 0, isSave: false };
+  const diff = Math.round(((original - output) / original) * 100);
+  return { percent: Math.abs(diff), isSave: output < original };
+}
+
 function ext(filename) {
   const dot = filename.lastIndexOf('.');
   return dot >= 0 ? filename.slice(dot).toLowerCase() : '';
@@ -481,6 +492,24 @@ function renderResults(results) {
         return `<span class="badge badge-warning">${escapeHtml(w)}</span>`;
       }).join('');
 
+      let statsHtml = '';
+      if (res.originalSize !== undefined && res.outputSize !== undefined) {
+        const origFmt = formatExtension(res.originalName);
+        const outFmt = formatExtension(res.outputName || res.originalName);
+        const { percent, isSave } = calculateSavings(res.originalSize, res.outputSize);
+        const savingClass = res.originalSize === res.outputSize ? 'stat-neutral'
+          : isSave ? 'stat-save' : 'stat-increase';
+        const savingText = res.originalSize === res.outputSize ? '大小不變'
+          : isSave ? `節省 ${percent}%` : `增加 ${percent}%`;
+        statsHtml = `
+          <div class="result-stats">
+            <div class="stat-row">
+              <span class="stat-label">${origFmt} ${formatBytes(res.originalSize)} → ${outFmt} ${formatBytes(res.outputSize)}</span>
+              <span class="${savingClass}">${savingText}</span>
+            </div>
+          </div>`;
+      }
+
       // Use original file as thumbnail source — avoids hitting the download
       // endpoint (which deletes the file on first access). The original file
       // is visually close enough for a preview, and the real converted file
@@ -496,6 +525,7 @@ function renderResults(results) {
         </div>
         <div class="result-body">
           <div class="result-filename" title="${escapeHtml(res.outputName || res.originalName)}">${escapeHtml(res.outputName || res.originalName)}</div>
+          ${statsHtml}
           <a class="result-download" href="${escapeHtml(res.downloadUrl)}" download="${escapeHtml(res.outputName || res.originalName)}">
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
               <path d="M7 1.5V9M3.5 6L7 9.5L10.5 6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
@@ -596,21 +626,73 @@ convertBtn.addEventListener('click', async () => {
 
 // ── Download All ──────────────────────────────
 
-downloadAllBtn.addEventListener('click', () => {
+function setDownloadLoading(isLoading) {
+  downloadAllBtn.disabled = isLoading;
+  if (isLoading) {
+    downloadAllBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true" style="animation:spin 0.8s linear infinite">
+        <circle cx="10" cy="10" r="8" stroke="white" stroke-width="2" stroke-dasharray="40" stroke-dashoffset="15" stroke-linecap="round"/>
+      </svg>
+      下載中…`;
+  } else {
+    downloadAllBtn.innerHTML = `
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M8 2V10M4 7L8 11L12 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M2 13H14" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      全部下載`;
+  }
+}
+
+downloadAllBtn.addEventListener('click', async () => {
   const successes = convertResults.filter(r => r.success && r.downloadUrl);
   if (!successes.length) return;
 
-  // Trigger downloads with a small stagger to avoid browser blocking
-  successes.forEach((res, i) => {
-    setTimeout(() => {
-      const a = document.createElement('a');
-      a.href     = res.downloadUrl;
-      a.download = res.outputName || res.originalName || 'download';
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    }, i * 200);
-  });
+  if (successes.length === 1) {
+    const a = document.createElement('a');
+    a.href = successes[0].downloadUrl;
+    a.download = successes[0].outputName || successes[0].originalName || 'download';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    return;
+  }
+
+  setDownloadLoading(true);
+  try {
+    const filenames = successes.map(res => {
+      const match = res.downloadUrl.match(/\/download\/([a-zA-Z0-9\-\.]+)/);
+      return match ? match[1] : null;
+    }).filter(Boolean);
+
+    if (filenames.length === 0) throw new Error('無法解析檔案名稱');
+
+    const response = await fetch('/api/zip', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ files: filenames }),
+    });
+
+    if (!response.ok) {
+      let errMsg = `伺服器錯誤（${response.status}）`;
+      try { const d = await response.json(); if (d?.error) errMsg = d.error; } catch (_) {}
+      throw new Error(errMsg);
+    }
+
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'images.zip';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    showError(`下載 ZIP 失敗：${err.message || '請稍後再試'}`);
+  } finally {
+    setDownloadLoading(false);
+  }
 });
 
 // ── Turnstile callbacks ───────────────────────

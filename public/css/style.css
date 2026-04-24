@@ -335,7 +335,7 @@ body {
 }
 
 /* =============================================
-   JPG Options
+   JPG / AVIF / WebP Options
    ============================================= */
 .jpg-options {
   display: flex;
@@ -423,6 +423,33 @@ body {
 .slider:hover::-webkit-slider-thumb,
 .slider:focus::-webkit-slider-thumb {
   box-shadow: 0 0 0 5px rgba(108, 99, 255, 0.35);
+}
+
+.avif-options {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeIn 0.2s ease;
+}
+
+.webp-options {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  animation: fadeIn 0.2s ease;
+}
+.webp-lossless-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  font-size: 0.84rem;
+  color: var(--accent);
+  background: rgba(108,99,255,0.08);
+  border: 1px solid rgba(108,99,255,0.2);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin: 0;
+  animation: fadeIn 0.2s ease;
 }
 
 /* =============================================
@@ -760,6 +787,25 @@ body {
   background: var(--error-bg);
   border-top: 1px solid rgba(248, 113, 113, 0.2);
 }
+
+.result-stats {
+  padding: 6px 0;
+  border-top: 1px solid rgba(108,99,255,0.15);
+  margin: 6px 0 8px;
+}
+.stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+.stat-save { font-size: 0.76rem; font-weight: 600; color: var(--success); }
+.stat-increase { font-size: 0.76rem; font-weight: 600; color: var(--text-muted); }
+.stat-neutral { font-size: 0.76rem; font-weight: 500; color: var(--text-muted); }
 
 /* =============================================
    Footer

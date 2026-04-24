@@ -178,6 +178,15 @@ router.post(
         }
       }
 
+      // Parse and validate webpQuality
+      let webpQuality = 80;
+      if (req.body.webpQuality !== undefined) {
+        webpQuality = parseInt(req.body.webpQuality, 10);
+        if (isNaN(webpQuality) || webpQuality < 1 || webpQuality > 100) {
+          return res.status(400).json({ error: 'webpQuality 必須為 1–100 之間的整數' });
+        }
+      }
+
       // Parse bgColor (only used for JPG output)
       const bgColor = req.body.bgColor || '#ffffff';
       if (!/^#[0-9a-fA-F]{6}$/.test(bgColor)) {
@@ -243,7 +252,7 @@ router.post(
             const { buffer: outBuf, outputName, warnings } = await convertImage(
               buffer,
               originalname,
-              { outputFormat, jpgQuality, avifQuality, bgColor },
+              { outputFormat, jpgQuality, avifQuality, webpQuality, bgColor },
             );
 
             // 4. Write to tmp with UUID prefix to avoid collisions
