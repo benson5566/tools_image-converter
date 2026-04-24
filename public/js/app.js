@@ -375,11 +375,18 @@ function setProgressDone(i, success, msg) {
   }
 }
 
+// Track object URLs so we can revoke them later to free memory
+const _thumbUrls = [];
+
 function renderResults(results) {
+  // Revoke any previous thumbnail object URLs
+  _thumbUrls.forEach(u => URL.revokeObjectURL(u));
+  _thumbUrls.length = 0;
+
   resultsList.innerHTML = '';
   convertResults = results;
 
-  results.forEach(res => {
+  results.forEach((res, idx) => {
     const card = document.createElement('div');
     card.className = 'result-card';
 
@@ -398,7 +405,13 @@ function renderResults(results) {
         return `<span class="badge badge-warning">${escapeHtml(w)}</span>`;
       }).join('');
 
-      const thumbSrc = res.thumbnailUrl || res.downloadUrl;
+      // Use original file as thumbnail source — avoids hitting the download
+      // endpoint (which deletes the file on first access). The original file
+      // is visually close enough for a preview, and the real converted file
+      // is preserved for when the user clicks the download button.
+      const originalFile = selectedFiles[idx];
+      const thumbSrc = originalFile ? URL.createObjectURL(originalFile) : '';
+      if (thumbSrc) _thumbUrls.push(thumbSrc);
 
       card.innerHTML = `
         <div class="result-thumb-wrap">
