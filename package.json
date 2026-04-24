@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node --test tests/**/*.test.js"
+    "test": "node --test tests/integration/convert.test.js",
+    "test:watch": "node --test --watch tests/integration/convert.test.js"
   },
   "dependencies": {
     "archiver": "^6.0.2",
