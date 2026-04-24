@@ -722,9 +722,20 @@ window.onTurnstileError = function() {
 const cfWidget = document.querySelector('.cf-turnstile');
 if (cfWidget && cfWidget.dataset.sitekey === '0x4AAAAAAA_PLACEHOLDER') {
   turnstileToken = 'dev-bypass';
-  // Hide the widget wrapper so the placeholder UI doesn't confuse users in dev
   const turnstileWrapper = document.querySelector('.turnstile-wrapper');
   if (turnstileWrapper) turnstileWrapper.hidden = true;
 }
+
+// If no Turnstile token after 5 s (widget failed silently, wrong domain, network
+// error, etc.) hide the widget and unblock the convert button.  Safe because the
+// backend only enforces Turnstile when TURNSTILE_SECRET_KEY is configured.
+setTimeout(() => {
+  if (!turnstileToken) {
+    const wrapper = document.querySelector('.turnstile-wrapper');
+    if (wrapper) wrapper.hidden = true;
+    turnstileToken = 'timeout-bypass';
+    updateConvertBtn();
+  }
+}, 5000);
 
 updateConvertBtn();
