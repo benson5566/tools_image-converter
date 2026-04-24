@@ -116,9 +116,11 @@ app.use((err, _req, res, _next) => {
 });
 
 // ── Start server ───────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`[image-converter] Server listening on http://localhost:${PORT}`);
-  console.log(`[image-converter] Temp files: ${TMP_DIR}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    console.log(`[image-converter] Server listening on http://localhost:${PORT}`);
+    console.log(`[image-converter] Temp files: ${TMP_DIR}`);
+  });
+}
 
 module.exports = app; // export for testing
