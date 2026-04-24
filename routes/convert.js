@@ -336,17 +336,9 @@ router.get('/download/:filename', async (req, res) => {
     ? decodeURIComponent(rawName).replace(/[\r\n\t]/g, '_').slice(0, 255)
     : filename;
 
-  res.download(filePath, downloadName, async (err) => {
+  res.download(filePath, downloadName, (err) => {
     if (err) {
-      // Header already sent – just log
       logger.error('download error', { file: filename, message: err.message });
-      return;
-    }
-    // Delete after successful download
-    try {
-      await fsp.unlink(filePath);
-    } catch {
-      // Ignore – TTL cleanup will handle it
     }
   });
 });
