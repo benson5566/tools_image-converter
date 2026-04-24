@@ -121,6 +121,9 @@ router.post(
     try {
       // ── Cloudflare Turnstile verification (when secret key is configured) ──
       const TURNSTILE_SECRET = process.env.TURNSTILE_SECRET_KEY;
+      if (!TURNSTILE_SECRET && process.env.NODE_ENV === 'production') {
+        logger.error('TURNSTILE_SECRET_KEY is not set in production — bot protection is disabled');
+      }
       if (TURNSTILE_SECRET) {
         const token = req.body['cf-turnstile-response'];
         if (!token) return res.status(400).json({ error: '請完成人機驗證' });
@@ -307,7 +310,7 @@ router.get('/download/:filename', async (req, res) => {
   // otherwise fall back to the stored filename.
   const rawName = req.query.name;
   const downloadName = rawName
-    ? decodeURIComponent(rawName).replace(/[\r\n\t]/g, '_')
+    ? decodeURIComponent(rawName).replace(/[\r\n\t]/g, '_').slice(0, 255)
     : filename;
 
   res.download(filePath, downloadName, async (err) => {
