@@ -416,7 +416,7 @@ fileList.addEventListener('click', e => {
 // ── Convert button state ─────────────────────
 
 function updateConvertBtn() {
-  convertBtn.disabled = selectedFiles.length === 0 || isConverting || !turnstileToken;
+  convertBtn.disabled = selectedFiles.length === 0 || isConverting;
 }
 
 // ── Conversion ───────────────────────────────
@@ -725,17 +725,5 @@ if (cfWidget && cfWidget.dataset.sitekey === '0x4AAAAAAA_PLACEHOLDER') {
   const turnstileWrapper = document.querySelector('.turnstile-wrapper');
   if (turnstileWrapper) turnstileWrapper.hidden = true;
 }
-
-// If no Turnstile token after 5 s (widget failed silently, wrong domain, network
-// error, etc.) hide the widget and unblock the convert button.  Safe because the
-// backend only enforces Turnstile when TURNSTILE_SECRET_KEY is configured.
-setTimeout(() => {
-  if (!turnstileToken) {
-    const wrapper = document.querySelector('.turnstile-wrapper');
-    if (wrapper) wrapper.hidden = true;
-    turnstileToken = 'timeout-bypass';
-    updateConvertBtn();
-  }
-}, 5000);
 
 updateConvertBtn();
